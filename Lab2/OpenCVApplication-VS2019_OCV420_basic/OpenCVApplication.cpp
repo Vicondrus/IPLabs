@@ -777,6 +777,8 @@ void toHSV() {
 		Mat dsth = Mat(height, width, CV_8UC1);
 		Mat dsts = Mat(height, width, CV_8UC1);
 		Mat dstv = Mat(height, width, CV_8UC1);
+		Mat dsthsv = Mat(height, width, CV_8UC3);
+		Mat dstConverted = Mat(height, width, CV_8UC3);
 		for (int i = 0; i < height; i++)
 		{
 			for (int j = 0; j < width; j++)
@@ -785,8 +787,8 @@ void toHSV() {
 				double r = ((double)val[2]) / 255;
 				double g = ((double)val[1]) / 255;
 				double b = ((double)val[0]) / 255;
-				double M = max(r, g, b);
-				double m = min(r, g, b);
+				double M = max(r, max(g, b));
+				double m = min(r, min(g, b));
 				double C = M - m;
 				double h, s, v;
 				v = M;
@@ -807,9 +809,14 @@ void toHSV() {
 				if (h < 0)
 					h += 360;
 
-				dsth.at<uchar>(i, j) = h * 255 / 360;
+				dsth.at<uchar>(i, j) = h / 2;
 				dsts.at<uchar>(i, j) = s * 255;
 				dstv.at<uchar>(i, j) = v * 255;
+
+
+				dsthsv.at<Vec3b>(i, j)[0] = dsth.at<uchar>(i, j);
+				dsthsv.at<Vec3b>(i, j)[1] = dsts.at<uchar>(i, j);
+				dsthsv.at<Vec3b>(i, j)[2] = dstv.at<uchar>(i, j);
 			}
 		}
 
@@ -818,10 +825,15 @@ void toHSV() {
 		// Print (in the console window) the processing time in [ms] 
 		printf("Time = %.3f [ms]\n", t * 1000);
 
+		cvtColor(dsthsv, dstConverted, COLOR_HSV2BGR, 0);
+
+
 		imshow("input image", src);
 		imshow("h", dsth);
 		imshow("s", dsts);
 		imshow("v", dstv);
+
+		imshow("converted", dstConverted);
 
 		waitKey();
 	}
@@ -857,45 +869,58 @@ void detectSign() {
 int low_H = 0;
 int high_H = 360;
 
-static void on_low_H_thresh_trackbar(int, void*)
+Mat aux;
+
+static void trackbar(int, void*)
 {
-	low_H = min(high_H - 1, low_H);
 	setTrackbarPos("Low H", "Slider", low_H);
+
+	
+	Mat hsvImg = Mat(aux.rows, aux.cols, CV_8UC3);
+	cv::cvtColor(aux, hsvImg, COLOR_BGR2HSV);
+	Mat hsv_channels[3];
+	cv::split(hsvImg, hsv_channels);
+	Mat mask;
+	cv::inRange(hsv_channels[0], Scalar(low_H, 255, 255), Scalar(high_H, 255, 255), mask);
+
+	imshow("sign", mask);
+
 }
-static void on_high_H_thresh_trackbar(int, void*)
-{
-	high_H = max(high_H, low_H + 1);
-	setTrackbarPos("High H", "Slider", high_H);
+
+bool isInside(Mat img, int i, int j) {
+	if (i<0 || i>=img.rows)
+		return false;
+	if (j<0 || j>=img.cols)
+		return false;
+	return true;
 }
 
 void trackbars() {
 	char fname[MAX_PATH];
 
-	namedWindow("Slider");
-	createTrackbar("Low H", "Slider", &low_H, 360, on_low_H_thresh_trackbar);
-	createTrackbar("High H", "Slider", &high_H, 360, on_high_H_thresh_trackbar);
-
 	while (openFileDlg(fname))
 	{
 
-		double t = (double)getTickCount(); // Get the current time [s]
+		namedWindow("Slider");
+
+		createTrackbar("Low H", "Slider", &low_H, 360, trackbar);
+		createTrackbar("High H", "Slider", &high_H, 360, trackbar);
 
 		Mat src = imread(fname, IMREAD_COLOR);
 		int height = src.rows;
 		int width = src.cols;
-		Mat hsvImg = Mat(height, width, CV_8UC3);
-		cv::cvtColor(src, hsvImg, COLOR_BGR2HSV);
-		Mat hsv_channels[3];
-		cv::split(hsvImg, hsv_channels);
-		Mat mask;
-		cv::inRange(hsv_channels[0], Scalar(low_H, 255, 255), Scalar(high_H, 255, 255), mask);
+		aux = src;
+
+		double t = (double)getTickCount(); // Get the current time [s]
+
+		
 		// Get the current time again and compute the time difference [s]
 		t = ((double)getTickCount() - t) / getTickFrequency();
 		// Print (in the console window) the processing time in [ms] 
 		printf("Time = %.3f [ms]\n", t * 1000);
 
 		imshow("input image", src);
-		imshow("sign", mask);
+		
 
 		waitKey();
 	}
