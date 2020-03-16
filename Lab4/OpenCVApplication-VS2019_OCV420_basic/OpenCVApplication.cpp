@@ -1207,7 +1207,7 @@ int *computeCenterOfMass(Mat src, Vec3b label) {
 			}
 		}
 	}
-	int result[2];
+	int *result = (int *)calloc(3,sizeof(int));
 	result[0] = sumr / area;
 	result[1] = sumc / area;
 	return result;
@@ -1216,7 +1216,7 @@ int *computeCenterOfMass(Mat src, Vec3b label) {
 int computeAxisOfElongation(Mat src, Vec3b label) {
 	int nom = 0;
 	int denom1 = 0, denom2 = 0;
-	int* centerOfMass = (int*)calloc(2, sizeof(int));
+	int* centerOfMass = (int*)calloc(3, sizeof(int));
 	int* aux = computeCenterOfMass(src, label);
 	centerOfMass[0] = aux[0];
 	centerOfMass[1] = aux[1];
@@ -1231,7 +1231,7 @@ int computeAxisOfElongation(Mat src, Vec3b label) {
 	}
 	if (nom == 0 && denom1 == denom2)
 		return -1000;
-	return (atan2(2 * nom, denom1 - denom2)/2) * 180 / PI;
+	return (atan2(2 * nom, (denom1 - denom2))/2 + PI) * 180 / PI;
 }
 
 bool isContour(Mat src, Vec3b label, int i, int j) {
@@ -1308,7 +1308,8 @@ int computeProjectionOnCol(Mat src, Vec3b label, int col) {
 void computeAttributesCallback(int event, int x, int y, int flags, void* param)
 {
 	Mat* src = (Mat*)param;
-	if (event == EVENT_LBUTTONDOWN)
+	//DOUBLE CLICK
+	if (event == EVENT_LBUTTONDBLCLK)
 	{
 		printf("Pos(x,y): %d,%d  Color(RGB): %d,%d,%d\n",
 			x, y,
@@ -1316,7 +1317,7 @@ void computeAttributesCallback(int event, int x, int y, int flags, void* param)
 			(int)(*src).at<Vec3b>(y, x)[1],
 			(int)(*src).at<Vec3b>(y, x)[0]);
 		Vec3b label = (*src).at <Vec3b>(y, x);
-		int* centerOfMass = (int*)calloc(2, sizeof(int));
+		int* centerOfMass = (int*)calloc(3, sizeof(int));
 		int* aux = computeCenterOfMass(*src, label);
 		centerOfMass[0] = aux[0];
 		centerOfMass[1] = aux[1];
@@ -1343,7 +1344,7 @@ void computeAttributesCallback(int event, int x, int y, int flags, void* param)
 			}
 		}
 
-		dst.at<Vec3b>(centerOfMass[0], centerOfMass[1]) = src->at<Vec3b>(centerOfMass[0], centerOfMass[1]);
+		circle(dst, Point(centerOfMass[1],centerOfMass[0]), 5, Scalar(255,0,255));
 
 		Point p1 = Point(centerOfMass[1], centerOfMass[0]);
 
@@ -1377,7 +1378,7 @@ void computeAttributesCallback(int event, int x, int y, int flags, void* param)
 	}
 }
 
-Mat thresholdingCallback(Mat src, int thArea, int phiLow, int phiHigh)
+void thresholdingCallback(Mat src, int thArea, int phiLow, int phiHigh)
 {
 	std::vector<Vec3b> labels;
 	for (int i = 0; i < src.rows; i++) {
@@ -1388,24 +1389,25 @@ Mat thresholdingCallback(Mat src, int thArea, int phiLow, int phiHigh)
 		}
 	}
 
+	std::vector<Vec3b> labelsAgain;
+
+	Mat dst = Mat(src.rows, src.cols, CV_8UC3);
 	for (int i = 0; i < labels.size(); i++) {
 		int area = computeArea(src, labels[i]);
 		int axis = computeAxisOfElongation(src, labels[i]);
-		if (area > thArea)
-			labels.erase(labels.begin() + i - 1);
-		if(axis < phiLow || axis > phiHigh)
-			labels.erase(labels.begin() + i - 1);
+		if (area < thArea&& phiLow < axis && axis < phiHigh)
+			labelsAgain.push_back(labels[i]);
 	}
 
-	Mat dst = Mat(src.rows, src.cols, CV_8UC3);
+	
 	for (int i = 0; i < src.rows; i++) {
 		for (int j = 0; j < src.cols; j++) {
 			Vec3b label = src.at<Vec3b>(i, j);
-			if (std::count(labels.begin(), labels.end(), label))
+			if (std::count(labelsAgain.begin(), labelsAgain.end(), label))
 				dst.at<Vec3b>(i, j) = src.at<Vec3b>(i, j);
 		}
 	}
-	return dst;
+	imshow("LOL", dst);
 }
 
 void testMouseClick()
@@ -1440,6 +1442,7 @@ int main()
 		destroyAllWindows();
 		printf("Menu:\n");
 		printf(" 1 - Test Mouse Click\n");
+		printf(" 2 - Threshold test\n");
 		printf(" 0 - Exit\n\n");
 		printf("Option: ");
 		scanf("%d",&op);
@@ -1448,6 +1451,15 @@ int main()
 			case 1:
 				testMouseClick();
 				break;
+			case 2:
+				char fname[MAXCHAR];
+				while (openFileDlg(fname))
+				{
+					Mat src = imread(fname);
+					thresholdingCallback(src,10000,180,270);
+					waitKey(0);
+					break;
+				}
 		}
 	}
 	while (op!=0);
