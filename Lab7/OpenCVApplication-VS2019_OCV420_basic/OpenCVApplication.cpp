@@ -2233,8 +2233,8 @@ Mat boundaryExtract(Mat image) {
 		for (int j = 0; j < 3; j++)
 			kernel.at<uchar>(i, j) = 0;
 	Mat er = erosion(image, kernel);
-	imshow("er", er);
-	waitKey(0);
+	//imshow("src", er);
+	//waitKey(1);
 	Mat dst = subtract(image, er);
 	return dst;
 }
@@ -2283,6 +2283,19 @@ Mat intersection(Mat A, Mat B) {
 	return dst;
 }
 
+Mat imageUnion(Mat A, Mat B) {
+	Mat dst = Mat(A.rows, B.cols, CV_8UC1);
+	for (int i = 0; i < A.rows; i++) {
+		for (int j = 0; j < A.cols; j++) {
+			if (A.at<uchar>(i, j) == 0 || B.at<uchar>(i, j) == 0)
+				dst.at<uchar>(i, j) = 0;
+			else
+				dst.at<uchar>(i, j) = 255;
+		}
+	}
+	return dst;
+}
+
 bool checkEquality(Mat A, Mat B) {
 	for (int i = 0; i < A.rows; i++) {
 		for (int j = 0; j < A.cols; j++) {
@@ -2298,18 +2311,8 @@ Mat fillRegion(Mat image) {
 	for (int i = 0; i < image.rows; i++)
 		for (int j = 0; j < image.cols; j++)
 			dst.at<uchar>(i, j) = 255;
-	for (int i = 0; i < image.rows; i++) {
-		for (int j = 0; j < image.cols; j++) {
-			if (image.at<uchar>(i, j) == 0) {
-				if (image.at<uchar>(i + 1, j + 1) == 255) {
-					dst.at<uchar>(i + 1, j + 1) = 0;
-					goto getout;
-				}
-			}
-		}
-	}
 
-	getout:
+	dst.at<uchar>(image.rows / 2, image.cols / 2) = 0;
 
 	imshow("dst", dst);
 	waitKey(0);
@@ -2332,7 +2335,7 @@ Mat fillRegion(Mat image) {
 		imshow("dst", dst);
 		waitKey(1);
 	}
-	return dst;
+	return imageUnion(image, dst);
 }
 
 void fillRegionImage() {
