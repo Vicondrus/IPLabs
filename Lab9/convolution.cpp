@@ -62,7 +62,7 @@ void convolution(Mat_<int> &filter, Mat_<uchar> &img, Mat_<uchar> &output) {
             int S = 0;
             for (int u = 0; u < filter.rows; u++) {
                 for (int v = 0; v < filter.cols; v++) {
-                    S += filter.at<int>(u, v) * img.at<int>(i - u + k, j - v + k);
+                    S += filter.at<int>(u, v) * img.at<int>(i + u - k, j + v - k);
                 }
             }
             output.at<int>(i, j) = S / scalingCoeff + additionFactor;
@@ -140,48 +140,48 @@ Mat generic_frequency_domain_filter(Mat src)
     return dst;
 }
 
-//int main() {
-//
-//
-//    // PART 1: convolution in the spatial domain
-//    Mat_<uchar> img = imread("cameraman.bmp", IMREAD_GRAYSCALE);
-//    Mat_<uchar> outputImage;
-//
-//    // LOW PASS
-//    // mean filter 5x5
-//    int meanFilterData5x5[25];
-//    fill_n(meanFilterData5x5, 25, 1);
-//    Mat_<int> meanFilter5x5(5, 5, meanFilterData5x5);
-//
-//    // mean filter 3x3
-//    Mat_<int> meanFilter3x3(3, 3, meanFilterData5x5);
-//
-//    // gaussian filter
-//    int gaussianFilterData[9] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
-//    Mat_<int> gaussianFilter(3, 3, gaussianFilterData);
-//
-//    // HIGH PASS
-//    // laplace filter 3x3
-//    int laplaceFilterData[9] = {-1, -1, -1, -1, 8, -1, -1, -1, -1};
-//    Mat_<int> laplaceFilter(3, 3, laplaceFilterData);
-//
-//    int highpassFilterData[9] = {-1, -1, -1, -1, 9, -1, -1, -1, -1};
-//    Mat_<int> highpassFilter(3, 3, highpassFilterData);
-//
-//    //TODO: convolution with the mean filter 5 x 5
-//    //TODO: convolution with the mean filter 3 x 3
-//    //TODO: convolution with the gaussian filter
-//    //TODO: convolution with the laplacian filter
-//    //TODO: convolution with the highpass filter
-//
-//
-//    // PART 2: convolution in the frequency domain
-//    // use the generic_frequency_domain_filter() function
-//
-//    // TODO: convolution with the ideal low pass filter (formula 9.16) take R^2 = 20
-//    // TODO: convolution with the ideal high pass filter (formula 9.17) take R^2 = 20
-//    // TODO: convolution with the Gaussian low pass filter (formula 9.18) take A = 10
-//    // TODO: convolution with the Gaussian high pass filter (formula 9.19) take A = 10
-//
-//    return 0;
-//}
+int main() {
+
+
+    // PART 1: convolution in the spatial domain
+    Mat_<uchar> img = imread("cameraman.bmp", IMREAD_GRAYSCALE);
+    Mat_<uchar> outputImage;
+
+    // LOW PASS
+    // mean filter 5x5
+    int meanFilterData5x5[25];
+    fill_n(meanFilterData5x5, 25, 1);
+    Mat_<int> meanFilter5x5(5, 5, meanFilterData5x5);
+
+    // mean filter 3x3
+    Mat_<int> meanFilter3x3(3, 3, meanFilterData5x5);
+
+    // gaussian filter
+    int gaussianFilterData[9] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
+    Mat_<int> gaussianFilter(3, 3, gaussianFilterData);
+
+    // HIGH PASS
+    // laplace filter 3x3
+    int laplaceFilterData[9] = {-1, -1, -1, -1, 8, -1, -1, -1, -1};
+    Mat_<int> laplaceFilter(3, 3, laplaceFilterData);
+
+    int highpassFilterData[9] = {-1, -1, -1, -1, 9, -1, -1, -1, -1};
+    Mat_<int> highpassFilter(3, 3, highpassFilterData);
+
+    //TODO: convolution with the mean filter 5 x 5
+    //TODO: convolution with the mean filter 3 x 3
+    //TODO: convolution with the gaussian filter
+    //TODO: convolution with the laplacian filter
+    //TODO: convolution with the highpass filter
+
+
+    // PART 2: convolution in the frequency domain
+    // use the generic_frequency_domain_filter() function
+
+    // TODO: convolution with the ideal low pass filter (formula 9.16) take R^2 = 20
+    // TODO: convolution with the ideal high pass filter (formula 9.17) take R^2 = 20
+    // TODO: convolution with the Gaussian low pass filter (formula 9.18) take A = 10
+    // TODO: convolution with the Gaussian high pass filter (formula 9.19) take A = 10
+
+    return 0;
+}

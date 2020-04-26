@@ -7,9 +7,6 @@
 #include <random>
 #include <stack>
 
-using namespace std;
-using namespace cv;
-
 void testOpenImage()
 {
 	char fname[MAX_PATH];
@@ -2657,10 +2654,9 @@ void eqImage() {
 	}
 }
 
-void convolution(Mat_<int>& filter, Mat_<uchar>& img, Mat_<uchar>& output) {
+Mat convolution(Mat filter, Mat img) {
 
-	output.create(img.size());
-	memcpy(output.data, img.data, img.rows * img.cols * sizeof(uchar));
+	Mat output = Mat(img.rows, img.cols, CV_8UC1);
 
 	int scalingCoeff = 1;
 	int additionFactor = 0;
@@ -2711,40 +2707,99 @@ void convolution(Mat_<int>& filter, Mat_<uchar>& img, Mat_<uchar>& output) {
 			int S = 0;
 			for (int u = 0; u < filter.rows; u++) {
 				for (int v = 0; v < filter.cols; v++) {
-					S += filter.at<int>(u, v) * img.at<int>(i - u + k, j - v + k);
+					S += filter.at<int>(u, v) * img.at<uchar>(i + u - k, j + v - k);
 				}
 			}
-			output.at<int>(i, j) = S / scalingCoeff + additionFactor;
+			output.at<uchar>(i, j) = S / scalingCoeff + additionFactor;
 		}
 	}
+
+	return output;
 }
 
-int main()
-{
-	// PART 1: convolution in the spatial domain
-	Mat_<uchar> img = imread("cameraman.bmp", IMREAD_GRAYSCALE);
-	Mat_<uchar> outputImage;
+void applyFilters() {
+
+	Mat src;
 
 	// LOW PASS
 	// mean filter 5x5
-	int meanFilterData5x5[25];
-	fill_n(meanFilterData5x5, 25, 1);
-	Mat_<int> meanFilter5x5(5, 5, meanFilterData5x5);
+	int meanFilterData5x5[25] = { 1, 1, 1, 1, 1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 };
+	Mat meanFilter5x5 = Mat(5, 5, CV_32SC1);
+	for (int i = 0; i < 5; i++)
+		for (int j = 0; j < 5; j++)
+			meanFilter5x5.at<int>(i,j) = meanFilterData5x5[i * 5 + j];
 
 	// mean filter 3x3
-	Mat_<int> meanFilter3x3(3, 3, meanFilterData5x5);
+	Mat meanFilter3x3 = Mat(3, 3, CV_32SC1);
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			meanFilter3x3.at<int>(i,j) = meanFilterData5x5[i * 3 + j];
 
 	// gaussian filter
 	int gaussianFilterData[9] = { 1, 2, 1, 2, 4, 2, 1, 2, 1 };
-	Mat_<int> gaussianFilter(3, 3, gaussianFilterData);
+	Mat gaussianFilter = Mat(3, 3, CV_32SC1);
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			gaussianFilter.at<int>(i,j) = gaussianFilterData[i * 3 + j];
 
 	// HIGH PASS
 	// laplace filter 3x3
 	int laplaceFilterData[9] = { -1, -1, -1, -1, 8, -1, -1, -1, -1 };
-	Mat_<int> laplaceFilter(3, 3, laplaceFilterData);
+	Mat laplaceFilter = Mat(3, 3, CV_32SC1);
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			laplaceFilter.at<int>(i,j) = laplaceFilterData[i * 3 + j];
 
 	int highpassFilterData[9] = { -1, -1, -1, -1, 9, -1, -1, -1, -1 };
-	Mat_<int> highpassFilter(3, 3, highpassFilterData);
+	Mat highPassFilter = Mat(3, 3, CV_32SC1);
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			highPassFilter.at<int>(i,j) = highpassFilterData[i * 3 + j];
 
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		Mat src = imread(fname, IMREAD_GRAYSCALE);
+		Mat output = convolution(meanFilter3x3, src);
+		imshow("output", output);
+		waitKey(0);
+		output = convolution(meanFilter5x5, src);
+		imshow("output", output);
+		waitKey(0);
+		output = convolution(gaussianFilter, src);
+		imshow("output", output);
+		waitKey(0);
+		output = convolution(laplaceFilter, src);
+		imshow("output", output);
+		waitKey(0);
+		output = convolution(highPassFilter, src);
+		imshow("output", output);
+		waitKey(0);
+	}
+
+	
+}
+
+int main()
+{
+	int op;
+	int tr;
+	do
+	{
+		system("cls");
+		destroyAllWindows();
+		printf("Menu:\n");
+		printf(" 1 - Filters\n");
+		printf(" 0 - Exit\n\n");
+		printf("Option: ");
+		scanf("%d",&op);
+		switch (op)
+		{
+		case 1:
+			applyFilters();
+			break;
+		}
+	}
+	while (op!=0);
 	return 0;
 }
