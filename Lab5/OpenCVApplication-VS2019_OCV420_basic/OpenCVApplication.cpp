@@ -1514,6 +1514,7 @@ void bfsLabel() {
 			for (int j = 0; j < width; j++)
 				labels.at<int>(i, j) = 0;
 
+		//a simple bfs on a relatively big graph (each pixel is a node)
 		for (int i = 0; i < height; i++) {
 			for (int j = 0; j < width; j++) {
 				uchar val = src.at<uchar>(i, j);
@@ -1540,6 +1541,7 @@ void bfsLabel() {
 		}
 
 
+		//comptue the colors for each label and store them
 		Mat labelColors = Mat(label + 1, 1, CV_8UC3);
 		for (int i = 0; i < label; i++) {
 			labelColors.at<Vec3b>(i, 0)[0] = 0;
@@ -1594,6 +1596,7 @@ void twoPassLabel() {
 		int label = 0;
 		Mat labels = Mat(height, width, CV_32SC1);
 
+		//init with zeroes
 		for (int i = 0; i < height; i++)
 			for (int j = 0; j < width; j++)
 				labels.at<int>(i, j) = 0;
@@ -1602,18 +1605,23 @@ void twoPassLabel() {
 
 		for (int i = 0; i < height; i++) {
 			for (int j = 0; j < width; j++) {
+				//for each pixel
 				if (src.at<uchar>(i, j) == 0 && labels.at<int>(i, j) == 0) {
 					std::vector<int> L;
+					// for each of the pixel's previous neighbours
 					for each (Vec2i neighbour in getPNeighbours(src, i, j))
 					{
+						//put the neighbour (if already labeled) in L
 						if (labels.at<int>(neighbour[0], neighbour[1]) > 0)
 							L.push_back(labels.at<int>(neighbour[0], neighbour[1]));
 					}
+					// if it has no labeled neighbours make another label
 					if (L.size() == 0) {
 						label++;
 						edges.resize(label + 1);
 						labels.at<int>(i, j) = label;
 					}
+					//else make the graph and assign the smallest label
 					else {
 						int x = *std::min_element(L.begin(), L.end());
 						labels.at<int>(i, j) = x;
@@ -1628,6 +1636,7 @@ void twoPassLabel() {
 			}
 		}
 
+		// show the intermediate result
 		Mat labelColors = Mat(label + 1, 1, CV_8UC3);
 		for (int i = 0; i < label; i++) {
 			labelColors.at<Vec3b>(i, 0)[0] = 0;
@@ -1660,6 +1669,8 @@ void twoPassLabel() {
 		for (int i = 0; i < label + 1; i++)
 				newlabels.at<int>(i, 0) = 0;
 
+		//second pass for finding equivalence classes
+		//a BFS on the built graphs
 		for (int i = 1; i < label + 1; i++) {
 			if (newlabels.at<int>(i, 0) == 0) {
 				newlabel++;
