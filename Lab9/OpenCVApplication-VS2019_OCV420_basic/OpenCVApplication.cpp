@@ -2780,6 +2780,111 @@ void applyFilters() {
 	
 }
 
+void centering_transform(Mat img) {
+	//expects floating point image
+	for (int i = 0; i < img.rows; i++) {
+		for (int j = 0; j < img.cols; j++) {
+			img.at<float>(i, j) = ((i + j) & 1) ? -img.at<float>(i, j) : img.at<float>(i, j);
+		}
+	}
+}
+
+Mat generic_frequency_domain_filter(Mat src, int type, int param)
+{
+	int height = src.rows;
+	int width = src.cols;
+
+	Mat srcf;
+	src.convertTo(srcf, CV_32FC1);
+	// Centering transformation
+	centering_transform(srcf);
+
+	//perform forward transform with complex image output
+	Mat fourier;
+	dft(srcf, fourier, DFT_COMPLEX_OUTPUT);
+
+	//split into real and imaginary channels fourier(i, j) = Re(i, j) + i * Im(i, j)
+	Mat channels[] = { Mat::zeros(src.size(), CV_32F), Mat::zeros(src.size(), CV_32F) };
+	split(fourier, channels);  // channels[0] = Re (real part), channels[1] = Im (imaginary part)
+
+	//calculate magnitude and phase in floating point images mag and phi
+	// http://www3.ncc.edu/faculty/ens/schoenf/elt115/complex.html
+	// from cartesian to polar coordinates
+
+	Mat mag, phi;
+	magnitude(channels[0], channels[1], mag);
+	phase(channels[0], channels[1], phi);
+
+
+	// TODO: Display here the log of magnitude (Add 1 to the magnitude to avoid log(0)) (see image 9.4e))
+	// do not forget to normalize
+	Mat logMag = Mat(height, width, CV_32FC1);
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+			logMag.at<float>(i,j) = log(mag.at<float>(i, j) + 1);
+
+	Mat logMat;
+	normalize(logMag, logMat, 0, 255, NORM_MINMAX, CV_8UC1);
+	imshow("log", logMat);
+
+	// TODO: Insert filtering operations here ( channels[0] = Re(DFT(I), channels[1] = Im(DFT(I) )
+	for (int u = 0; u < height; u++)
+		for (int v = 0; v < height; v++)
+			if (type == 0) {
+				if (pow((height / 2 - u), 2) + pow((width / 2 - v), 2) > param) {
+					channels[0].at<float>(u, v) = 0;
+					channels[1].at<float>(u, v) = 0;
+				}
+			}
+			else if (type == 1) {
+				if (pow((height / 2 - u), 2) + pow((width / 2 - v), 2) <= param) {
+					channels[0].at<float>(u, v) = 0;
+					channels[1].at<float>(u, v) = 0;
+				}
+			}
+			else if (type == 2) {
+				channels[0].at<float>(u, v) = channels[0].at<float>(u, v) * exp(-(pow((height / 2 - u), 2) + pow((width / 2 - v), 2))/param);
+				channels[1].at<float>(u, v) = channels[1].at<float>(u, v) * exp(-(pow((height / 2 - u), 2) + pow((width / 2 - v), 2)) / param);
+			}
+			else if (type == 3) {
+				channels[0].at<float>(u, v) = channels[0].at<float>(u, v) * (1 - exp(-(pow((height / 2 - u), 2) + pow((width / 2 - v), 2)) / param));
+				channels[1].at<float>(u, v) = channels[1].at<float>(u, v) * (1 - exp(-(pow((height / 2 - u), 2) + pow((width / 2 - v), 2)) / param));
+			}
+
+
+	//perform inverse transform and put results in dstf
+	Mat dst, dstf;
+	merge(channels, 2, fourier);
+	dft(fourier, dstf, DFT_INVERSE | DFT_REAL_OUTPUT);
+
+	// Inverse Centering transformation
+	centering_transform(dstf);
+
+	//normalize the result and put in the destination image
+	normalize(dstf, dst, 0, 255, NORM_MINMAX, CV_8UC1);
+
+	return dst;
+}
+
+void applyFreqFilter() {
+	Mat src;
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		Mat src = imread(fname, IMREAD_GRAYSCALE);
+		Mat dst1 = generic_frequency_domain_filter(src, 0, 20);
+		Mat dst2 = generic_frequency_domain_filter(src, 1, 20);
+		Mat dst3 = generic_frequency_domain_filter(src, 2, 100);
+		Mat dst4 = generic_frequency_domain_filter(src, 3, 100);
+		imshow("src", src);
+		imshow("dst1", dst1);
+		imshow("dst2", dst2);
+		imshow("dst3", dst3);
+		imshow("dst4", dst4);
+		waitKey(0);
+	}
+}
+
 int main()
 {
 	int op;
@@ -2790,6 +2895,7 @@ int main()
 		destroyAllWindows();
 		printf("Menu:\n");
 		printf(" 1 - Filters\n");
+		printf(" 2 - Frequency Filters\n");
 		printf(" 0 - Exit\n\n");
 		printf("Option: ");
 		scanf("%d",&op);
@@ -2797,6 +2903,9 @@ int main()
 		{
 		case 1:
 			applyFilters();
+			break;
+		case 2:
+			applyFreqFilter();
 			break;
 		}
 	}
