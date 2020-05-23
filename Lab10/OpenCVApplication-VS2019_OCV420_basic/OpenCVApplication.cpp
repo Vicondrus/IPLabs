@@ -1465,15 +1465,12 @@ std::vector<Vec2i> get4Neighbours(int i, int j) {
 	return neighbours;
 }
 
-std::vector<Vec2i> get8Neighbours(int i, int j) {
+std::vector<Point2i> get8Neighbours(int i, int j) {
 	int di[8] = { 0,-1,-1,-1,0,1,1,1 };
 	int dj[8] = { 1,1,0,-1,-1,-1,0,1 };
-	std::vector<Vec2i> neighbours;
+	std::vector<Point2i> neighbours;
 	for (int k = 0; k < 8; k++) {
-		Vec2i vec;
-		vec[0] = i + di[k];
-		vec[1] = j + dj[k];
-		neighbours.push_back(vec);
+		neighbours.push_back({ i + di[k], j + dj[j] });
 	}
 	return neighbours;
 }
@@ -1572,8 +1569,6 @@ void bfsLabel() {
 
 
 }
-
-
 
 void twoPassLabel() {
 	Mat src;

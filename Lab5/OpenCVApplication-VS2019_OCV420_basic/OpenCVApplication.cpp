@@ -1492,6 +1492,68 @@ std::vector<Vec2i> getPNeighbours(Mat src, int i, int j) {
 	return neighbours;
 }
 
+Mat bfsLabel2(Mat src)
+{
+	Mat dst = Mat(height, width, CV_8UC3);
+
+	unsigned int label = 0;
+	Mat labels = Mat(src.rows, src.cols, CV_32UC1);
+
+	for (int i = 0; i < src.rows; i++)
+		for (int j = 0; j < cols.rows; j++)
+			labels.at<unsigned int>(i, j) = 0;
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < cols.rows; j++) {
+			uchar val = src.at<uchar>(i, j);
+			if (val == 0 && labels.at<unsigned int>(i, j) == 0) {
+				label++;
+				std::queue<Point2i> Q;
+				labels.at<unsigned int>(i, j) = label;
+				Q.push({ i,j });
+				while (!Q.empty()) {
+					Point2i q = Q.front();
+					Q.pop();
+					std::vector<Point2i> neighbors = get8Neighbours(q.x, q.y);
+					for (Point2i p : neighbors) {
+						if (isInside(src, p.x, p.y) && labels.at<unsigned char>(p.x, p.y) == 0 && src.at<unsigned char>(p.x, p.y) == 0) {
+							labels.at<unsigned int>(p.x, p.y) = label;
+							q.push(p);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	Mat labelColors = Mat(label + 1, 1, CV_8UC3);
+	for (int i = 0; i < label; i++) {
+		labelColors.at<Vec3b>(i, 0)[0] = 0;
+		labelColors.at<Vec3b>(i, 0)[1] = 0;
+		labelColors.at<Vec3b>(i, 0)[2] = 0;
+	}
+	std::default_random_engine gen;
+	std::uniform_int_distribution<int> d(0, 255);
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			//printf("%d\n", labels.at<int>(i, j));
+			if (labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] == 0) {
+				uchar b = d(gen);
+				uchar g = d(gen);
+				uchar r = d(gen);
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] = b;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] = g;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] = r;
+			}
+			dst.at<Vec3b>(i, j)[0] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0];
+			dst.at<Vec3b>(i, j)[1] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1];
+			dst.at<Vec3b>(i, j)[2] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2];
+		}
+	}
+
+	return dst;
+}
+
 void bfsLabel() {
 	Mat src;
 
