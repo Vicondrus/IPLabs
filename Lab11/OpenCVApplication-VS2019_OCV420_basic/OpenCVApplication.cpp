@@ -403,7 +403,7 @@ void computeMultilevelThresholding() {
 		Mat src = imread(fname, IMREAD_GRAYSCALE);
 		int height = src.rows;
 		int width = src.cols;
-		float hist[256];
+		int hist[256];
 		float pdf[256];
 		for (int i = 0; i < 256; i++)
 			hist[i] = 0;
@@ -415,21 +415,11 @@ void computeMultilevelThresholding() {
 			}
 		}
 
-		int max_hist = 0;
-
 		for (int i = 0; i < 256; i++)
-			if (hist[i] > max_hist)
-				max_hist = hist[i];
-
-		for (int i = 0; i < 256; i++)
-			pdf[i] = (float)hist[i] / (float)max_hist;
+			pdf[i] = (float)hist[i] / (height * width);
 
 		int wh = 5;
 		float th = 0.0003;
-
-		float ks[256];
-		for (int i = 0; i < 256; i++)
-			ks[i] = 0;
 
 		std::vector<int> maxs;
 
@@ -438,28 +428,18 @@ void computeMultilevelThresholding() {
 			bool ok = false;
 			for (int x = -wh; x <= wh; x++) {
 				v += pdf[k + x];
-				if (pdf[k] < pdf[k + x])
+				if (x != 0 && pdf[k] <= pdf[k + x])
 					ok = true;
 			}
 			v = v / (2 * wh + 1);
 			if (pdf[k] > (v + th) && ok == false) {
-				ks[k] = pdf[k];
 				maxs.push_back(k);
 			}
 		}
 
 		maxs.push_back(0);
 		maxs.push_back(255);
-		std::sort(maxs.begin(),maxs.end());
-
-		for (int i = 0; i < wh; i++)
-			ks[i] = 0;
-		for (int i = 255-wh; i < 256; i++)
-			ks[i] =	1;
-
-		int show[256];
-		for (int i = 0; i < 256; i++)
-			show[i] = ks[i] * max_hist;
+		std::sort(maxs.begin(), maxs.end());
 
 		Mat dst = Mat(height, width, CV_8UC1);
 
@@ -468,12 +448,12 @@ void computeMultilevelThresholding() {
 			for (int j = 0; j < width; j++)
 			{
 				uchar val = src.at<uchar>(i, j);
-				int minvalue = 100;
+				int minvalue = 1000;
 				int q = 0;
-				for (int i = 0; i < maxs.size(); i++) {
-					if (minvalue > std::abs(val - maxs[i])) {
-						minvalue = std::abs(val - maxs[i]);
-						q = maxs[i];
+				for (int l = 0; l < maxs.size(); l++) {
+					if (minvalue > std::abs(val - maxs[l])) {
+						minvalue = std::abs(val - maxs[l]);
+						q = maxs[l];
 					}
 				}
 				dst.at<uchar>(i, j) = q;
@@ -487,7 +467,20 @@ void computeMultilevelThresholding() {
 		printf("Time = %.3f [ms]\n", t * 1000);
 		imshow("input image", src);
 		imshow("dst", dst);
-		showHistogram("norm", show, 256, 200);
+
+		int hst2[256];
+		for (int i = 0; i < 256; i++)
+			hst2[i] = 0;
+		for (int i = 0; i < height; i++)
+		{
+			for (int j = 0; j < width; j++)
+			{
+				hst2[dst.at<uchar>(i, j)]++;
+			}
+		}
+
+		showHistogram("hist", hist, 256, 200);
+		showHistogram("hst2", hst2, 256, 200);
 		waitKey();
 	}
 }
@@ -513,21 +506,11 @@ void computeFloydSteinberg() {
 			}
 		}
 
-		int max_hist = 0;
-
 		for (int i = 0; i < 256; i++)
-			if (hist[i] > max_hist)
-				max_hist = hist[i];
-
-		for (int i = 0; i < 256; i++)
-			pdf[i] = (float)hist[i] / (float)max_hist;
+			pdf[i] = (float)hist[i] / (height * width);
 
 		int wh = 5;
 		float th = 0.0003;
-
-		float ks[256];
-		for (int i = 0; i < 256; i++)
-			ks[i] = 0;
 
 		std::vector<int> maxs;
 
@@ -536,12 +519,11 @@ void computeFloydSteinberg() {
 			bool ok = false;
 			for (int x = -wh; x <= wh; x++) {
 				v += pdf[k + x];
-				if (pdf[k] < pdf[k + x])
+				if (x != 0 && pdf[k] <= pdf[k + x])
 					ok = true;
 			}
 			v = v / (2 * wh + 1);
 			if (pdf[k] > (v + th) && ok == false) {
-				ks[k] = pdf[k];
 				maxs.push_back(k);
 			}
 		}
@@ -549,15 +531,6 @@ void computeFloydSteinberg() {
 		maxs.push_back(0);
 		maxs.push_back(255);
 		std::sort(maxs.begin(), maxs.end());
-
-		for (int i = 0; i < wh; i++)
-			ks[i] = 0;
-		for (int i = 255 - wh; i < 256; i++)
-			ks[i] = 1;
-
-		int show[256];
-		for (int i = 0; i < 256; i++)
-			show[i] = ks[i] * max_hist;
 
 		Mat dst = Mat(height, width, CV_8UC1);
 		Mat dst2 = Mat(height, width, CV_8UC1);
@@ -569,31 +542,41 @@ void computeFloydSteinberg() {
 				uchar val = src.at<uchar>(i, j);
 				int minvalue = 100;
 				int q = 0;
-				for (int i = 0; i < maxs.size(); i++) {
-					if (minvalue > std::abs(val - maxs[i])) {
-						minvalue = std::abs(val - maxs[i]);
-						q = maxs[i];
+				for (int l = 0; l < maxs.size(); l++) {
+					if (minvalue > std::abs(val - maxs[l])) {
+						minvalue = std::abs(val - maxs[l]);
+						q = maxs[l];
 					}
 				}
 				dst.at<uchar>(i, j) = q;
-				int error = val - q;
+				dst2.at<uchar>(i, j) = src.at<uchar>(i, j);
 			}
 		}
 
 		for (int i = 0; i < height; i++)
 		{
 			for (int j = 0; j < width; j++) {
-				int error = src.at<uchar>(i, j) - dst.at<uchar>(i, j);
-				if (error > 0)
-					int az = 0;
+
+				uchar val = dst2.at<uchar>(i, j);
+				int minvalue = 1000;
+				int q = 0;
+				for (int l = 0; l < maxs.size(); l++) {
+					if (minvalue > std::abs(val - maxs[l])) {
+						minvalue = std::abs(val - maxs[l]);
+						q = maxs[l];
+					}
+				}
+				dst2.at<uchar>(i, j) = q;
+
+				int error = val - dst2.at<uchar>(i, j);
 				if (isInside(src, i, j + 1))
-					dst2.at<uchar>(i, j + 1) = max(0, min(dst.at<uchar>(i, j + 1) + (7 * error) / 16, 255));
+					dst2.at<uchar>(i, j + 1) = max(0, min(dst2.at<uchar>(i, j + 1) + (7 * error) / 16, 255));
 				if (isInside(src, i + 1, j - 1))
-					dst2.at<uchar>(i + 1, j - 1) = max(0, min(255, dst.at<uchar>(i + 1, j - 1) + (3 * error) / 16));
+					dst2.at<uchar>(i + 1, j - 1) = max(0, min(255, dst2.at<uchar>(i + 1, j - 1) + (3 * error) / 16));
 				if (isInside(src, i + 1, j))
-					dst2.at<uchar>(i + 1, j) = max(0, min(255, dst.at<uchar>(i + 1, j) + (5 * error) / 16));
+					dst2.at<uchar>(i + 1, j) = max(0, min(255, dst2.at<uchar>(i + 1, j) + (5 * error) / 16));
 				if (isInside(src, i + 1, j + 1))
-					dst2.at<uchar>(i + 1, j + 1) = max(0, min(255, dst.at<uchar>(i + 1, j + 1) + (error) / 16));
+					dst2.at<uchar>(i + 1, j + 1) = max(0, min(255, dst2.at<uchar>(i + 1, j + 1) + (error) / 16));
 			}
 		}
 
@@ -604,7 +587,6 @@ void computeFloydSteinberg() {
 		imshow("input image", src);
 		imshow("dst", dst);
 		imshow("dst2", dst2);
-		showHistogram("norm", show, 256, 200);
 		waitKey();
 	}
 }
@@ -1586,7 +1568,292 @@ void bfsLabel() {
 
 }
 
+std::vector<Point2i> get8Neighbours2(int i, int j) {
+	int di[8] = { -1,-1,-1,0,0,1,1,1 };
+	int dj[8] = { -1,0,1,-1,1,-1,0,1 };
+	std::vector<Point2i> neighbours;
+	for (int k = 0; k < 8; k++) {
+		neighbours.push_back({ i + di[k],j + dj[k] });
+	}
+	return neighbours;
+}
 
+std::vector<Point2i> getPNeighbours2(Mat src, int i, int j) {
+	int di[4] = { -1,-1,-1,0 };
+	int dj[4] = { -1,0,1,-1 };
+	std::vector<Point2i> neighbours;
+	for (int k = 0; k < 4; k++) {
+		if (isInside(src, i + di[k], j + dj[k]))
+			neighbours.push_back({ i + di[k],j + dj[k] });
+	}
+	return neighbours;
+}
+
+Mat bfsLabel2(Mat src)
+{
+	Mat dst = Mat(src.rows, src.cols, CV_8UC3);
+
+	int label = 0;
+	Mat labels = Mat(src.rows, src.cols, CV_32SC1);
+
+	for (int i = 0; i < src.rows; i++)
+		for (int j = 0; j < src.rows; j++)
+			labels.at<int>(i, j) = 0;
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			dst.at<Vec3b>(i, j)[0] = 255;
+			dst.at<Vec3b>(i, j)[1] = 255;
+			dst.at<Vec3b>(i, j)[2] = 255;
+		}
+	}
+
+	imshow("labeled", dst);
+	waitKey(1);
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			uchar val = src.at<uchar>(i, j);
+			if (val == 0 && labels.at<int>(i, j) == 0) {
+				label++;
+				std::queue<Point2i> Q;
+				labels.at<int>(i, j) = label;
+				Q.push({ i,j });
+
+				dst.at<Vec3b>(i, j)[0] = 0;
+				dst.at<Vec3b>(i, j)[1] = 0;
+				dst.at<Vec3b>(i, j)[2] = 0;
+				imshow("labeled", dst);
+				waitKey(1);
+
+				while (!Q.empty()) {
+					Point2i q = Q.front();
+					Q.pop();
+					std::vector<Point2i> neighbors = get8Neighbours2(q.x, q.y);
+					for (Point2i p : neighbors) {
+						if (isInside(src, p.x, p.y) && labels.at<int>(p.x, p.y) == 0 && src.at<uchar>(p.x, p.y) == 0) {
+							labels.at<int>(p.x, p.y) = label;
+							Q.push({ p.x,p.y });
+
+							dst.at<Vec3b>(p.x, p.y)[0] = 0;
+							dst.at<Vec3b>(p.x, p.y)[1] = 0;
+							dst.at<Vec3b>(p.x, p.y)[2] = 0;
+							imshow("labeled", dst);
+							waitKey(1);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	Mat labelColors = Mat(label + 1, 1, CV_8UC3);
+	for (int i = 0; i < label; i++) {
+		labelColors.at<Vec3b>(i, 0)[0] = 0;
+		labelColors.at<Vec3b>(i, 0)[1] = 0;
+		labelColors.at<Vec3b>(i, 0)[2] = 0;
+	}
+	std::default_random_engine gen;
+	std::uniform_int_distribution<int> d(0, 255);
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			if (labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] == 0) {
+				uchar b = d(gen);
+				uchar g = d(gen);
+				uchar r = d(gen);
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] = b;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] = g;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] = r;
+			}
+			dst.at<Vec3b>(i, j) = labelColors.at<Vec3b>(labels.at<int>(i, j), 0);
+			/*if (labels.at<int>(i, j) == 0) {
+				dst.at<Vec3b>(i, j)[0] = 255;
+				dst.at<Vec3b>(i, j)[1] = 255;
+				dst.at<Vec3b>(i, j)[2] = 255;
+			}*/
+		}
+	}
+
+	return dst;
+}
+
+
+Mat twoPassLabel2(Mat src) {
+	Mat dst = Mat(src.rows, src.cols, CV_8UC3);
+
+	int label = 0;
+	Mat labels = Mat(src.rows, src.cols, CV_32SC1);
+
+	for (int i = 0; i < src.rows; i++)
+		for (int j = 0; j < src.cols; j++)
+			labels.at<int>(i, j) = 0;
+
+	std::vector<std::vector<int>> edges;
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			uchar val = src.at<uchar>(i, j);
+			if (val == 0 && labels.at<int>(i, j) == 0) {
+				std::vector<int> L;
+
+				for (Point2i p : getPNeighbours2(src, i, j)) {
+					if (labels.at<int>(p.x, p.y) > 0)
+						L.push_back(labels.at<int>(p.x, p.y));
+				}
+
+				if (L.empty()) {
+					label++;
+					edges.resize(label + 1);
+					labels.at<int>(i, j) = label;
+				}
+
+				else {
+					int min = *std::min_element(L.begin(), L.end());
+					labels.at<int>(i, j) = min;
+					for (int l : L) {
+						if (l != min) {
+							edges.at(min).push_back(l);
+							edges.at(l).push_back(min);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			if (labels.at<int>(i, j) > 0) {
+				dst.at<Vec3b>(i, j)[0] = 0;
+				dst.at<Vec3b>(i, j)[1] = 0;
+				dst.at<Vec3b>(i, j)[2] = 0;
+			}
+			else {
+				dst.at<Vec3b>(i, j)[0] = 255;
+				dst.at<Vec3b>(i, j)[1] = 255;
+				dst.at<Vec3b>(i, j)[2] = 255;
+			}
+		}
+	}
+
+	imshow("lole", dst);
+	waitKey(0);
+
+	int newLabel = 0;
+	int* newLabels = (int*)calloc(label + 1, sizeof(int));
+
+	for (int i = 1; i < label + 1; i++) {
+		if (newLabels[i] == 0) {
+			newLabel++;
+			newLabels[i] = newLabel;
+			std::queue<int> Q;
+			Q.push(i);
+			while (!Q.empty()) {
+				int q = Q.front();
+				Q.pop();
+				for (int x : edges.at(q)) {
+					if (newLabels[x] == 0) {
+						newLabels[x] = newLabel;
+						Q.push(x);
+					}
+				}
+			}
+		}
+	}
+
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			labels.at<int>(i, j) = newLabels[labels.at<int>(i, j)];
+		}
+	}
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			if (labels.at<int>(i, j) > 0) {
+				dst.at<Vec3b>(i, j)[0] = 0;
+				dst.at<Vec3b>(i, j)[1] = 0;
+				dst.at<Vec3b>(i, j)[2] = 0;
+			}
+			else {
+				dst.at<Vec3b>(i, j)[0] = 255;
+				dst.at<Vec3b>(i, j)[1] = 255;
+				dst.at<Vec3b>(i, j)[2] = 255;
+			}
+		}
+	}
+
+	imshow("lole", dst);
+	waitKey(0);
+
+	Mat labelColors = Mat(label + 1, 1, CV_8UC3);
+	for (int i = 0; i < label; i++) {
+		labelColors.at<Vec3b>(i, 0)[0] = 0;
+		labelColors.at<Vec3b>(i, 0)[1] = 0;
+		labelColors.at<Vec3b>(i, 0)[2] = 0;
+	}
+	std::default_random_engine gen;
+	std::uniform_int_distribution<int> d(0, 255);
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			//printf("%d\n", labels.at<int>(i, j));
+			if (labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] == 0) {
+				uchar b = d(gen);
+				uchar g = d(gen);
+				uchar r = d(gen);
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] = b;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] = g;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] = r;
+			}
+			dst.at<Vec3b>(i, j)[0] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0];
+			dst.at<Vec3b>(i, j)[1] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1];
+			dst.at<Vec3b>(i, j)[2] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2];
+		}
+	}
+
+	return dst;
+}
+
+void showTwoPass()
+{
+	Mat src;
+
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		src = imread(fname, IMREAD_GRAYSCALE);
+
+		//src = cvtBinary(src);
+
+		Mat dst = twoPassLabel2(src);
+
+		imshow("source", src);
+		imshow("labeled", dst);
+		waitKey(0);
+	}
+
+}
+
+
+void showBfs()
+{
+	Mat src;
+
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		src = imread(fname, IMREAD_GRAYSCALE);
+
+		//src = cvtBinary(src);
+
+		Mat dst = bfsLabel2(src);
+
+		imshow("source", src);
+		imshow("labeled", dst);
+		waitKey(0);
+	}
+
+}
 
 void twoPassLabel() {
 	Mat src;

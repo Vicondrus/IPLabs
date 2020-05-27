@@ -1478,6 +1478,16 @@ std::vector<Vec2i> get8Neighbours(int i, int j) {
 	return neighbours;
 }
 
+std::vector<Point2i> get8Neighbours2(int i, int j) {
+	int di[8] = { -1,-1,-1,0,0,1,1,1 };
+	int dj[8] = { -1,0,1,-1,1,-1,0,1 };
+	std::vector<Point2i> neighbours;
+	for (int k = 0; k < 8; k++) {
+		neighbours.push_back({ i + di[k],j + dj[k] });
+	}
+	return neighbours;
+}
+
 std::vector<Vec2i> getPNeighbours(Mat src, int i, int j) {
 	int di[4] = { -1,-1,-1,0 };
 	int dj[4] = { -1,0,1,-1 };
@@ -1492,33 +1502,68 @@ std::vector<Vec2i> getPNeighbours(Mat src, int i, int j) {
 	return neighbours;
 }
 
+std::vector<Point2i> getPNeighbours2(Mat src, int i, int j) {
+	int di[4] = { -1,-1,-1,0 };
+	int dj[4] = { -1,0,1,-1 };
+	std::vector<Point2i> neighbours;
+	for (int k = 0; k < 4; k++) {
+		if (isInside(src, i + di[k], j + dj[k]))
+			neighbours.push_back({ i + di[k],j + dj[k] });
+	}
+	return neighbours;
+}
+
 Mat bfsLabel2(Mat src)
 {
-	Mat dst = Mat(height, width, CV_8UC3);
+	Mat dst = Mat(src.rows, src.cols, CV_8UC3);
 
-	unsigned int label = 0;
-	Mat labels = Mat(src.rows, src.cols, CV_32UC1);
+	int label = 0;
+	Mat labels = Mat(src.rows, src.cols, CV_32SC1);
 
 	for (int i = 0; i < src.rows; i++)
-		for (int j = 0; j < cols.rows; j++)
-			labels.at<unsigned int>(i, j) = 0;
+		for (int j = 0; j < src.rows; j++)
+			labels.at<int>(i, j) = 0;
 
 	for (int i = 0; i < src.rows; i++) {
-		for (int j = 0; j < cols.rows; j++) {
+		for (int j = 0; j < src.cols; j++) {
+			dst.at<Vec3b>(i, j)[0] = 255;
+			dst.at<Vec3b>(i, j)[1] = 255;
+			dst.at<Vec3b>(i, j)[2] = 255;
+		}
+	}
+
+	imshow("labeled", dst);
+	waitKey(1);
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
 			uchar val = src.at<uchar>(i, j);
-			if (val == 0 && labels.at<unsigned int>(i, j) == 0) {
+			if (val == 0 && labels.at<int>(i, j) == 0) {
 				label++;
 				std::queue<Point2i> Q;
-				labels.at<unsigned int>(i, j) = label;
+				labels.at<int>(i, j) = label;
 				Q.push({ i,j });
+
+				dst.at<Vec3b>(i, j)[0] = 0;
+				dst.at<Vec3b>(i, j)[1] = 0;
+				dst.at<Vec3b>(i, j)[2] = 0;
+				imshow("labeled", dst);
+				waitKey(1);
+
 				while (!Q.empty()) {
 					Point2i q = Q.front();
 					Q.pop();
-					std::vector<Point2i> neighbors = get8Neighbours(q.x, q.y);
+					std::vector<Point2i> neighbors = get8Neighbours2(q.x, q.y);
 					for (Point2i p : neighbors) {
-						if (isInside(src, p.x, p.y) && labels.at<unsigned char>(p.x, p.y) == 0 && src.at<unsigned char>(p.x, p.y) == 0) {
-							labels.at<unsigned int>(p.x, p.y) = label;
-							q.push(p);
+						if (isInside(src, p.x, p.y) && labels.at<int>(p.x, p.y) == 0 && src.at<uchar>(p.x, p.y) == 0) {
+							labels.at<int>(p.x, p.y) = label;
+							Q.push({ p.x,p.y });
+
+							dst.at<Vec3b>(p.x, p.y)[0] = 0;
+							dst.at<Vec3b>(p.x, p.y)[1] = 0;
+							dst.at<Vec3b>(p.x, p.y)[2] = 0;
+							imshow("labeled", dst);
+							waitKey(1);
 						}
 					}
 				}
@@ -1534,9 +1579,8 @@ Mat bfsLabel2(Mat src)
 	}
 	std::default_random_engine gen;
 	std::uniform_int_distribution<int> d(0, 255);
-	for (int i = 0; i < height; i++) {
-		for (int j = 0; j < width; j++) {
-			//printf("%d\n", labels.at<int>(i, j));
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
 			if (labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] == 0) {
 				uchar b = d(gen);
 				uchar g = d(gen);
@@ -1545,9 +1589,12 @@ Mat bfsLabel2(Mat src)
 				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] = g;
 				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] = r;
 			}
-			dst.at<Vec3b>(i, j)[0] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0];
-			dst.at<Vec3b>(i, j)[1] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1];
-			dst.at<Vec3b>(i, j)[2] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2];
+			dst.at<Vec3b>(i, j) = labelColors.at<Vec3b>(labels.at<int>(i, j), 0);
+			/*if (labels.at<int>(i, j) == 0) {
+				dst.at<Vec3b>(i, j)[0] = 255;
+				dst.at<Vec3b>(i, j)[1] = 255;
+				dst.at<Vec3b>(i, j)[2] = 255;
+			}*/
 		}
 	}
 
@@ -1637,7 +1684,181 @@ void bfsLabel() {
 
 }
 
+void showBfs()
+{
+	Mat src;
 
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		src = imread(fname, IMREAD_GRAYSCALE);
+
+		//src = cvtBinary(src);
+
+		Mat dst = bfsLabel2(src);
+
+		imshow("source", src);
+		imshow("labeled", dst);
+		waitKey(0);
+	}
+
+}
+
+Mat twoPassLabel2(Mat src) {
+	Mat dst = Mat(src.rows, src.cols, CV_8UC3);
+
+	int label = 0;
+	Mat labels = Mat(src.rows, src.cols, CV_32SC1);
+
+	for (int i = 0; i < src.rows; i++)
+		for (int j = 0; j < src.cols; j++)
+			labels.at<int>(i, j) = 0;
+
+	std::vector<std::vector<int>> edges;
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			uchar val = src.at<uchar>(i, j);
+			if (val == 0 && labels.at<int>(i, j) == 0) {
+				std::vector<int> L;
+				
+				for (Point2i p : getPNeighbours2(src, i, j)) {
+					if (labels.at<int>(p.x, p.y) > 0)
+						L.push_back(labels.at<int>(p.x, p.y));
+				}
+
+				if (L.empty()) {
+					label++;
+					edges.resize(label + 1);
+					labels.at<int>(i, j) = label;
+				}
+
+				else {
+					int min = *std::min_element(L.begin(), L.end());
+					labels.at<int>(i, j) = min;
+					for (int l : L) {
+						if (l != min) {
+							edges.at(min).push_back(l);
+							edges.at(l).push_back(min);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			if (labels.at<int>(i, j) > 0) {
+				dst.at<Vec3b>(i,j)[0] = 0;
+				dst.at<Vec3b>(i, j)[1] = 0;
+				dst.at<Vec3b>(i, j)[2] = 0;
+			}
+			else {
+				dst.at<Vec3b>(i, j)[0] = 255;
+				dst.at<Vec3b>(i, j)[1] = 255;
+				dst.at<Vec3b>(i, j)[2] = 255;
+			}
+		}
+	}
+
+	imshow("lole", dst);
+	waitKey(0);
+
+	int newLabel = 0;
+	int* newLabels = (int*)calloc(label + 1, sizeof(int));
+
+	for (int i = 1; i < label + 1; i++) {
+		if (newLabels[i] == 0) {
+			newLabel++;
+			newLabels[i] = newLabel;
+			std::queue<int> Q;
+			Q.push(i);
+			while (!Q.empty()) {
+				int q = Q.front();
+				Q.pop();
+				for (int x : edges.at(q)) {
+					if (newLabels[x] == 0) {
+						newLabels[x] = newLabel;
+						Q.push(x);
+					}
+				}
+			}
+		}
+	}
+
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			labels.at<int>(i, j) = newLabels[labels.at<int>(i, j)];
+		}
+	}
+
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			if (labels.at<int>(i, j) > 0) {
+				dst.at<Vec3b>(i, j)[0] = 0;
+				dst.at<Vec3b>(i, j)[1] = 0;
+				dst.at<Vec3b>(i, j)[2] = 0;
+			}
+			else {
+				dst.at<Vec3b>(i, j)[0] = 255;
+				dst.at<Vec3b>(i, j)[1] = 255;
+				dst.at<Vec3b>(i, j)[2] = 255;
+			}
+		}
+	}
+
+	imshow("lole", dst);
+	waitKey(0);
+
+	Mat labelColors = Mat(label + 1, 1, CV_8UC3);
+	for (int i = 0; i < label; i++) {
+		labelColors.at<Vec3b>(i, 0)[0] = 0;
+		labelColors.at<Vec3b>(i, 0)[1] = 0;
+		labelColors.at<Vec3b>(i, 0)[2] = 0;
+	}
+	std::default_random_engine gen;
+	std::uniform_int_distribution<int> d(0, 255);
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			//printf("%d\n", labels.at<int>(i, j));
+			if (labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] == 0 && labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] == 0) {
+				uchar b = d(gen);
+				uchar g = d(gen);
+				uchar r = d(gen);
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0] = b;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1] = g;
+				labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2] = r;
+			}
+			dst.at<Vec3b>(i, j)[0] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[0];
+			dst.at<Vec3b>(i, j)[1] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[1];
+			dst.at<Vec3b>(i, j)[2] = labelColors.at<Vec3b>(labels.at<int>(i, j), 0)[2];
+		}
+	}
+
+	return dst;
+}
+
+void showTwoPass()
+{
+	Mat src;
+
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		src = imread(fname, IMREAD_GRAYSCALE);
+
+		//src = cvtBinary(src);
+
+		Mat dst = twoPassLabel2(src);
+
+		imshow("source", src);
+		imshow("labeled", dst);
+		waitKey(0);
+	}
+
+}
 
 void twoPassLabel() {
 	Mat src;
@@ -1805,10 +2026,10 @@ int main()
 		switch (op)
 		{
 			case 1:
-				bfsLabel();
+				showBfs();
 				break;
 			case 2:
-				twoPassLabel();
+				showTwoPass();
 				break;
 		}
 	}

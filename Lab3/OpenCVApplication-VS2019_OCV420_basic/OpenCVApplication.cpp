@@ -436,7 +436,7 @@ void computeMultilevelThresholding() {
 		Mat src = imread(fname, IMREAD_GRAYSCALE);
 		int height = src.rows;
 		int width = src.cols;
-		float hist[256];
+		int hist[256];
 		float pdf[256];
 		for (int i = 0; i < 256; i++)
 			hist[i] = 0;
@@ -448,21 +448,11 @@ void computeMultilevelThresholding() {
 			}
 		}
 
-		int max_hist = 0;
-
 		for (int i = 0; i < 256; i++)
-			if (hist[i] > max_hist)
-				max_hist = hist[i];
-
-		for (int i = 0; i < 256; i++)
-			pdf[i] = (float)hist[i] / (float)max_hist;
+			pdf[i] = (float)hist[i] / (height*width);
 
 		int wh = 5;
 		float th = 0.0003;
-
-		float ks[256];
-		for (int i = 0; i < 256; i++)
-			ks[i] = 0;
 
 		std::vector<int> maxs;
 
@@ -471,12 +461,11 @@ void computeMultilevelThresholding() {
 			bool ok = false;
 			for (int x = -wh; x <= wh; x++) {
 				v += pdf[k + x];
-				if (pdf[k] < pdf[k + x])
+				if (x != 0 && pdf[k] <= pdf[k + x])
 					ok = true;
 			}
 			v = v / (2 * wh + 1);
 			if (pdf[k] > (v + th) && ok == false) {
-				ks[k] = pdf[k];
 				maxs.push_back(k);
 			}
 		}
@@ -485,15 +474,6 @@ void computeMultilevelThresholding() {
 		maxs.push_back(255);
 		std::sort(maxs.begin(),maxs.end());
 
-		for (int i = 0; i < wh; i++)
-			ks[i] = 0;
-		for (int i = 255-wh; i < 256; i++)
-			ks[i] =	1;
-
-		int show[256];
-		for (int i = 0; i < 256; i++)
-			show[i] = ks[i] * max_hist;
-
 		Mat dst = Mat(height, width, CV_8UC1);
 
 		for (int i = 0; i < height; i++)
@@ -501,12 +481,12 @@ void computeMultilevelThresholding() {
 			for (int j = 0; j < width; j++)
 			{
 				uchar val = src.at<uchar>(i, j);
-				int minvalue = 100;
+				int minvalue = 1000;
 				int q = 0;
-				for (int i = 0; i < maxs.size(); i++) {
-					if (minvalue > std::abs(val - maxs[i])) {
-						minvalue = std::abs(val - maxs[i]);
-						q = maxs[i];
+				for (int l = 0; l < maxs.size(); l++) {
+					if (minvalue > std::abs(val - maxs[l])) {
+						minvalue = std::abs(val - maxs[l]);
+						q = maxs[l];
 					}
 				}
 				dst.at<uchar>(i, j) = q;
@@ -520,7 +500,20 @@ void computeMultilevelThresholding() {
 		printf("Time = %.3f [ms]\n", t * 1000);
 		imshow("input image", src);
 		imshow("dst", dst);
-		showHistogram("norm", show, 256, 200);
+		
+		int hst2[256];
+		for (int i = 0; i < 256; i++)
+			hst2[i] = 0;
+		for (int i = 0; i < height; i++)
+		{
+			for (int j = 0; j < width; j++)
+			{
+				hst2[dst.at<uchar>(i, j)]++;
+			}
+		}
+
+		showHistogram("hist", hist, 256, 200);
+		showHistogram("hst2", hst2, 256, 200);
 		waitKey();
 	}
 }
@@ -546,21 +539,11 @@ void computeFloydSteinberg() {
 			}
 		}
 
-		int max_hist = 0;
-
 		for (int i = 0; i < 256; i++)
-			if (hist[i] > max_hist)
-				max_hist = hist[i];
-
-		for (int i = 0; i < 256; i++)
-			pdf[i] = (float)hist[i] / (float)max_hist;
+			pdf[i] = (float)hist[i] / (height * width);
 
 		int wh = 5;
 		float th = 0.0003;
-
-		float ks[256];
-		for (int i = 0; i < 256; i++)
-			ks[i] = 0;
 
 		std::vector<int> maxs;
 
@@ -569,12 +552,11 @@ void computeFloydSteinberg() {
 			bool ok = false;
 			for (int x = -wh; x <= wh; x++) {
 				v += pdf[k + x];
-				if (pdf[k] < pdf[k + x])
+				if (x != 0 && pdf[k] <= pdf[k + x])
 					ok = true;
 			}
 			v = v / (2 * wh + 1);
 			if (pdf[k] > (v + th) && ok == false) {
-				ks[k] = pdf[k];
 				maxs.push_back(k);
 			}
 		}
@@ -582,15 +564,6 @@ void computeFloydSteinberg() {
 		maxs.push_back(0);
 		maxs.push_back(255);
 		std::sort(maxs.begin(), maxs.end());
-
-		for (int i = 0; i < wh; i++)
-			ks[i] = 0;
-		for (int i = 255 - wh; i < 256; i++)
-			ks[i] = 1;
-
-		int show[256];
-		for (int i = 0; i < 256; i++)
-			show[i] = ks[i] * max_hist;
 
 		Mat dst = Mat(height, width, CV_8UC1);
 		Mat dst2 = Mat(height, width, CV_8UC1);
@@ -602,31 +575,41 @@ void computeFloydSteinberg() {
 				uchar val = src.at<uchar>(i, j);
 				int minvalue = 100;
 				int q = 0;
-				for (int i = 0; i < maxs.size(); i++) {
-					if (minvalue > std::abs(val - maxs[i])) {
-						minvalue = std::abs(val - maxs[i]);
-						q = maxs[i];
+				for (int l = 0; l < maxs.size(); l++) {
+					if (minvalue > std::abs(val - maxs[l])) {
+						minvalue = std::abs(val - maxs[l]);
+						q = maxs[l];
 					}
 				}
 				dst.at<uchar>(i, j) = q;
-				int error = val - q;
+				dst2.at<uchar>(i, j) = src.at<uchar>(i,j);
 			}
 		}
 
 		for (int i = 0; i < height; i++)
 		{
 			for (int j = 0; j < width; j++) {
-				int error = src.at<uchar>(i, j) - dst.at<uchar>(i, j);
-				if (error > 0)
-					int az = 0;
+
+				uchar val = dst2.at<uchar>(i, j);
+				int minvalue = 1000;
+				int q = 0;
+				for (int l = 0; l < maxs.size(); l++) {
+					if (minvalue > std::abs(val - maxs[l])) {
+						minvalue = std::abs(val - maxs[l]);
+						q = maxs[l];
+					}
+				}
+				dst2.at<uchar>(i, j) = q;
+
+				int error = val - dst2.at<uchar>(i, j);
 				if (isInside(src, i, j + 1))
-					dst2.at<uchar>(i, j + 1) = max(0, min(dst.at<uchar>(i, j + 1) + (7 * error) / 16, 255));
+					dst2.at<uchar>(i, j + 1) = max(0, min(dst2.at<uchar>(i, j + 1) + (7 * error) / 16, 255));
 				if (isInside(src, i + 1, j - 1))
-					dst2.at<uchar>(i + 1, j - 1) = max(0, min(255, dst.at<uchar>(i + 1, j - 1) + (3 * error) / 16));
+					dst2.at<uchar>(i + 1, j - 1) = max(0, min(255, dst2.at<uchar>(i + 1, j - 1) + (3 * error) / 16));
 				if (isInside(src, i + 1, j))
-					dst2.at<uchar>(i + 1, j) = max(0, min(255, dst.at<uchar>(i + 1, j) + (5 * error) / 16));
+					dst2.at<uchar>(i + 1, j) = max(0, min(255, dst2.at<uchar>(i + 1, j) + (5 * error) / 16));
 				if (isInside(src, i + 1, j + 1))
-					dst2.at<uchar>(i + 1, j + 1) = max(0, min(255, dst.at<uchar>(i + 1, j + 1) + (error) / 16));
+					dst2.at<uchar>(i + 1, j + 1) = max(0, min(255, dst2.at<uchar>(i + 1, j + 1) + (error) / 16));
 			}
 		}
 
@@ -637,7 +620,6 @@ void computeFloydSteinberg() {
 		imshow("input image", src);
 		imshow("dst", dst);
 		imshow("dst2", dst2);
-		showHistogram("norm", show, 256, 200);
 		waitKey();
 	}
 }
